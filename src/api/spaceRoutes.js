@@ -231,9 +231,12 @@ router.get('/',
 
     if (search) {
       const trimmed = search.trim();
+      const isOpgId = /^OPG-/i.test(trimmed);
+      const isPhone = /^\+?\d{6,15}$/.test(trimmed.replace(/[\s-]/g, ''));
+
       // Try $text search first for multi-word queries (better relevance)
       // Note: MongoDB does not allow $text and $near in the same query.
-      if (trimmed.length >= 3 && !(lat && lng)) {
+      if (!isOpgId && !isPhone && trimmed.length >= 3 && !(lat && lng)) {
         try {
           // Use MongoDB text index for relevance-scored search
           filter.$text = { $search: trimmed };
@@ -246,13 +249,18 @@ router.get('/',
       
       if (!useTextScore) {
         // Regex fallback — character-sequence matching for fuzzy behavior
-        const sanitized = trimmed.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&').replace(/\\s+/g, '');
-        const fuzzyPattern = sanitized.split('').join('.*?');
+        const exactSanitized = trimmed.replace(/[-[\]{}()*+?.,\\^$|#]/g, '\\$&');
+        const fuzzyPattern = exactSanitized.replace(/\s+/g, '').split('').join('.*?');
         filter.$or = [
           { name: { $regex: new RegExp(fuzzyPattern, 'i') } },
           { areaName: { $regex: new RegExp(fuzzyPattern, 'i') } },
           { chainName: { $regex: new RegExp(fuzzyPattern, 'i') } },
           { address: { $regex: new RegExp(fuzzyPattern, 'i') } },
+          { opgId: { $regex: new RegExp(exactSanitized, 'i') } },
+          { 'contact.phone': { $regex: new RegExp(exactSanitized, 'i') } },
+          { 'contact.phone2': { $regex: new RegExp(exactSanitized, 'i') } },
+          { category: { $regex: new RegExp(exactSanitized, 'i') } },
+          { primaryType: { $regex: new RegExp(exactSanitized, 'i') } }
         ];
       }
     }
@@ -317,16 +325,24 @@ router.get('/',
         spaces 
       });
     } catch (e) {
-      // If $text search fails (e.g. no text index), retry with regex
       if (useTextScore && e.message?.includes('text index')) {
         delete filter.$text;
-        const sanitized = search.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-        const fuzzyPattern = sanitized.split('').join('.*?');
+        
+        // Reset sortObj since textScore is no longer valid
+        sortObj = { [sortBy === 'relevance' ? 'qualityScore' : sortBy]: order === 'asc' ? 1 : -1 };
+
+        const exactSanitized = search.trim().replace(/[-[\]{}()*+?.,\\^$|#]/g, '\\$&');
+        const fuzzyPattern = exactSanitized.replace(/\s+/g, '').split('').join('.*?');
         filter.$or = [
           { name: { $regex: new RegExp(fuzzyPattern, 'i') } },
           { areaName: { $regex: new RegExp(fuzzyPattern, 'i') } },
           { chainName: { $regex: new RegExp(fuzzyPattern, 'i') } },
           { address: { $regex: new RegExp(fuzzyPattern, 'i') } },
+          { opgId: { $regex: new RegExp(exactSanitized, 'i') } },
+          { 'contact.phone': { $regex: new RegExp(exactSanitized, 'i') } },
+          { 'contact.phone2': { $regex: new RegExp(exactSanitized, 'i') } },
+          { category: { $regex: new RegExp(exactSanitized, 'i') } },
+          { primaryType: { $regex: new RegExp(exactSanitized, 'i') } }
         ];
         try {
           const [spaces, total] = await Promise.all([

@@ -774,8 +774,11 @@ async function scrapeReviews(page, maxReviews = 30) {
   if (maxReviews === 0) return { reviews, reviewSummary };
 
   try {
-    const tab = page.locator('button[aria-label*="reviews" i], button:has-text("Reviews")').first();
-    if (!await tab.isVisible({ timeout: 2000 }).catch(() => false)) return { reviews, reviewSummary };
+    let tab = page.locator('[role="tab"][aria-label*="Reviews" i], [role="tab"]:has-text("Reviews")').first();
+    if (!await tab.isVisible({ timeout: 1500 }).catch(() => false)) {
+      tab = page.locator('button[aria-label*="reviews" i], button:has-text("Reviews")').first();
+    }
+    if (!await tab.isVisible({ timeout: 1500 }).catch(() => false)) return { reviews, reviewSummary };
     await tab.click({ force: true });
     await sleep(1200, 2000);
 
@@ -825,8 +828,20 @@ async function scrapeReviews(page, maxReviews = 30) {
               .map(src => src.replace(/=w\d+-h\d+[^&]*/, '=w800-h600'));
 
             // Task 2: Owner reply with respondedAt
-            const ownerReplyText      = t('.CDe7pd');
-            const ownerRespondedAtRaw = t('.n5VP6b');
+            let ownerReplyText = null;
+            let ownerRespondedAtRaw = null;
+            const ownerReplyBlock = el.querySelector('.CDe7pd');
+            if (ownerReplyBlock) {
+              ownerReplyText = ownerReplyBlock.querySelector('.wiI7pd')?.textContent?.trim() || ownerReplyBlock.textContent?.trim();
+              if (ownerReplyText) {
+                ownerReplyText = ownerReplyText.replace(/^Response from the owner.*?ago\s*/i, '').trim();
+                ownerReplyText = ownerReplyText.replace(/^["“”\s]+|["“”\s]+$/g, '');
+              }
+              ownerRespondedAtRaw = ownerReplyBlock.querySelector('.n5VP6b')?.textContent?.trim() || t('.n5VP6b');
+            }
+
+            let text = t('.wiI7pd') || t('.MyEned span');
+            if (text) text = text.replace(/^["“”\s]+|["“”\s]+$/g, '');
 
             return {
               reviewId:    el.getAttribute('data-review-id') || null,
@@ -835,7 +850,7 @@ async function scrapeReviews(page, maxReviews = 30) {
               authorAvatar:g('.NBa7we img', 'src'),
               reviewerLocalGuideLevel,
               rating:      ratingNum,
-              text:        t('.wiI7pd') || t('.MyEned span'),
+              text:        text,
               publishedAt: t('.rsqaWe') || t('.xRkPPb span'),
               likes:       parseInt(t('.GBkF3d') || '0', 10) || 0,
               reviewPhotos,
@@ -879,8 +894,11 @@ async function scrapePhotosTab(page, existing = [], maxPhotos = 20) {
   if (maxPhotos === 0) return [...urls];
 
   try {
-    const tab = page.locator('button[aria-label*="Photos" i], button:has-text("Photos")').first();
-    if (!await tab.isVisible({ timeout: 2000 }).catch(() => false)) return [...urls];
+    let tab = page.locator('[role="tab"][aria-label*="Photos" i], [role="tab"]:has-text("Photos")').first();
+    if (!await tab.isVisible({ timeout: 1500 }).catch(() => false)) {
+      tab = page.locator('button[aria-label*="Photos" i], button:has-text("Photos")').first();
+    }
+    if (!await tab.isVisible({ timeout: 1500 }).catch(() => false)) return [...urls];
     await tab.click({ force: true });
     await sleep(1200, 2000);
 
