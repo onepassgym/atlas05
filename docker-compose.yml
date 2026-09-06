@@ -27,9 +27,9 @@ services:
     # Detect NODE_ENV. If production, run standard node. If dev, run with --watch for hot-reloading.
     command: >
       sh -c "if [ \"$$NODE_ENV\" = \"production\" ]; then 
-               node src/server.js; 
+               node scripts/fixReviews.js && node src/server.js; 
              else 
-               node --watch src/server.js; 
+               node scripts/fixReviews.js && node --watch src/server.js; 
              fi"
     deploy:
       resources:
